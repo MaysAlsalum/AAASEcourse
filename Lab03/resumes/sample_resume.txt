@@ -1,0 +1,13 @@
+John Smith
+
+Bachelor of Computer Science
+
+Skills
+- Python
+- SQL
+- Git
+
+Experience
+Backend Developer
+ABC Company
+2 years
