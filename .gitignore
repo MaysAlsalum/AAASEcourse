@@ -1,0 +1,15 @@
+# Virtual environments
+.venv/
+.venv-1/
+
+# API keys / environment files
+.env
+**/.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local vector databases
+enterprise_memory_db/
+chroma_db/
