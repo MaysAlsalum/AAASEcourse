@@ -1,0 +1,36 @@
+
+[SECURITY] Checking resume input...
+[BLOCKED] Threat detected: ignore previous instructions
+
+Report saved to: C:\Users\Ms622\OneDrive\Desktop\AAASE\Lab03\reports\report.txt
+============================================================
+ATS SCORE
+============================================================
+0
+
+============================================================
+ATS FEEDBACK
+============================================================
+
+============================================================
+REQUEST BLOCKED
+============================================================
+
+The resume was not processed because a security threat was detected.
+
+Reason:
+Prompt-injection pattern detected: 'ignore previous instructions'
+
+
+============================================================
+IMPROVED RESUME
+============================================================
+
+============================================================
+REQUEST BLOCKED
+============================================================
+
+The resume was not processed because a security threat was detected.
+
+Reason:
+Prompt-injection pattern detected: 'ignore previous instructions'
