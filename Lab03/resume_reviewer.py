@@ -13,6 +13,7 @@ from langgraph.graph import START
 from langgraph.graph import END
 
 import re
+from typing import Literal
 
 import os
 
@@ -51,7 +52,36 @@ class ResumeState(TypedDict):
 
     improved_resume: str
 
+
+    # Day 4 security fields
+    blocked: bool
+
+    security_reason: str
+
     
+
+
+# Security Configuration
+
+
+ATTACK_PATTERNS = [
+    r"ignore\s+(all\s+)?previous\s+instructions",
+    r"ignore\s+(all\s+)?prior\s+instructions",
+    r"disregard\s+(all\s+)?previous\s+instructions",
+    r"reveal\s+(the\s+)?system\s+prompt",
+    r"show\s+(me\s+)?your\s+system\s+prompt",
+    r"print\s+(the\s+)?hidden\s+instructions",
+    r"bypass\s+(the\s+)?security",
+    r"disable\s+(the\s+)?guardrails",
+    r"jailbreak",
+    r"developer\s+mode",
+]
+
+
+
+
+
+
 
 # Helper Functions
 
@@ -100,6 +130,95 @@ IMPROVED RESUME
 
 
 #Agents
+
+
+
+# Security Agent - Input Guardrail
+
+def input_guardrail(state: ResumeState) -> dict:
+    """
+    Inspect the resume before sending it to the LLM.
+
+    Blocks common prompt-injection and jailbreak attempts.
+    """
+
+    print("\n[SECURITY] Checking resume input...")
+
+    resume_text = state["resume"]
+
+    if not resume_text or not resume_text.strip():
+        return {
+            "blocked": True,
+            "security_reason": "The resume is empty."
+        }
+
+    normalized_text = resume_text.lower()
+
+    for pattern in ATTACK_PATTERNS:
+        match = re.search(pattern, normalized_text, re.IGNORECASE)
+
+        if match:
+            detected_text = match.group(0)
+
+            print(f"[BLOCKED] Threat detected: {detected_text}")
+
+            return {
+                "blocked": True,
+                "security_reason": (
+                    f"Prompt-injection pattern detected: "
+                    f"'{detected_text}'"
+                )
+            }
+
+    print("[SECURITY] Input approved.")
+
+    return {
+        "blocked": False,
+        "security_reason": ""
+    }
+
+
+# Blocked Request Handler
+
+def blocked_response(state: ResumeState) -> dict:
+    """
+    Generate a safe result when the security guardrail blocks input.
+    """
+
+    message = f"""
+============================================================
+REQUEST BLOCKED
+============================================================
+
+The resume was not processed because a security threat was detected.
+
+Reason:
+{state["security_reason"]}
+"""
+
+    return {
+        "analysis": message,
+        "ats_score": 0,
+        "ats_feedback": message,
+        "improved_resume": message
+    }
+
+
+
+
+# Security Router
+
+def security_router(
+    state: ResumeState
+) -> Literal["safe", "blocked"]:
+
+    if state["blocked"]:
+        return "blocked"
+
+    return "safe"
+
+
+
 
 # Agent 1 - Resume Analyzer Agent
 def resume_analyzer(state: ResumeState):
@@ -219,6 +338,14 @@ Requirements:
 
 builder = StateGraph(ResumeState)
 
+
+# Security nodes
+builder.add_node("input_guardrail", input_guardrail)
+
+builder.add_node("blocked_response", blocked_response)
+
+
+
 # Add nodes for each agent
 builder.add_node("resume_analyzer", resume_analyzer)
 
@@ -227,14 +354,32 @@ builder.add_node("ats_evaluator", ats_evaluator)
 builder.add_node("improve_resume", improve_resume)
 
 
-# Add edges to define the workflow
-builder.add_edge(START, "resume_analyzer")
 
+# Start with security
+builder.add_edge(START, "input_guardrail")
+
+# Continue only when the input is safe
+builder.add_conditional_edges(
+    "input_guardrail",
+    security_router,
+    {
+        "safe": "resume_analyzer",
+        "blocked": "blocked_response"
+    }
+)
+
+
+
+# Add edges to define the workflow
 builder.add_edge("resume_analyzer", "ats_evaluator")
 
 builder.add_edge("ats_evaluator", "improve_resume")
 
 builder.add_edge("improve_resume", END)
+
+
+# Blocked requests end immediately
+builder.add_edge("blocked_response", END)
 
 
 graph = builder.compile()
@@ -253,14 +398,17 @@ graph = builder.compile()
 ## Main Program
 BASE_DIR = Path(__file__).parent
 
-resume = load_resume(BASE_DIR / "resumes" / "sample_resume.txt")
+resume_path = BASE_DIR / "resumes" / "sample_resume2.txt"
+resume = load_resume(str(resume_path))
 
-state = {
+state: ResumeState = {
     "resume": resume,
     "analysis": "",
     "ats_score": 0,
     "ats_feedback": "",
-    "improved_resume": ""
+    "improved_resume": "",
+    "blocked": False,
+    "security_reason": ""
 }
 
 result = graph.invoke(state)
